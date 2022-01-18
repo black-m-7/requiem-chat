@@ -46,6 +46,9 @@
   color: turquoise;
 }
 
+.SignUp form .error {
+  color: red;
+}
 
 .SignIn {
   text-align: center;
