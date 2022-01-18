@@ -1,19 +1,32 @@
 import './App.css';
 import logo from './assets/logo.png'
 import send from './assets/send.png'
-import React, { useState, useEffect, useContext } from 'react' 
+import React, { useState, useEffect, useContext, useRef } from 'react' 
 import { Navigate, Link, BrowserRouter as Router, Route, Routes } from 'react-router-dom'
-import app from './config'
 import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, signOut } from "firebase/auth";
+import { getFirestore, collection, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore'
 
+import { initializeApp } from "firebase/app";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAMJbLHscz5AIoAk_sDgKj5HQ35Rxg1wK8",
+  authDomain: "requiem-collective.firebaseapp.com",
+  projectId: "requiem-collective",
+  storageBucket: "requiem-collective.appspot.com",
+  messagingSenderId: "533584097808",
+  appId: "1:533584097808:web:3ac59df36d3f891c7e1095"
+};
+
+const app = initializeApp(firebaseConfig);
 
 const AuthContext = React.createContext()
+const db = getFirestore()
+const auth = getAuth()
 
 const AuthProvider = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState(false)
+  const [currentUser, setCurrentUser] = useState(null)
 
   useEffect(() => {
-    const auth = getAuth()
     onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
     });
@@ -63,7 +76,6 @@ function SignUp() {
     e.preventDefault();
     validate()
     try {
-      const auth = getAuth()
       createUserWithEmailAndPassword(auth, user.email, user.password)
       updateProfile(auth.currentUser, {
         displayName: user.displayName
@@ -119,7 +131,6 @@ function SignIn() {
   const handleSubmit = (e) => {
     e.preventDefault()
     try {
-      const auth = getAuth()
       signInWithEmailAndPassword(auth, user.email, user.password);
     } catch (error) {
       alert(error);
@@ -151,14 +162,45 @@ function SignIn() {
 
 function ChatRoom() {
   const {currentUser} = useContext(AuthContext)
+  const [messages, setMessages] = useState([])
+  const [text, setText] = useState("")
+  const dummy = useRef(null);
+
+  useEffect(() => {
+    let test = false
+    const messagesRef = collection(db, "messages")
+    const q = query(messagesRef, orderBy("createdAt"), limit(50))
+    const unsub = onSnapshot(q, (querySnapshot) => {
+      const msgs = []
+      querySnapshot.forEach((doc) => {
+        msgs.push(doc.data())
+      })
+      if(!test) 
+      setMessages(msgs)
+    })
+    dummy.current?.scrollIntoView({ behavior: 'smooth' });
+    return () => {test=true}
+  }, [messages])
 
   const handleSignOut = (e) => {
-    const auth = getAuth()
     signOut(auth).then(() => {
       console.log("User signed out")
     }).catch((e) => {
       alert(e)
     })
+  }
+
+  const sendMessage = async (e) => {
+    e.preventDefault()
+    const {uid, displayName} = auth.currentUser
+    const messagesRef = collection(db, "messages")
+    await addDoc(messagesRef, {
+      uid: uid,
+      name: displayName,
+      text: text,
+      createdAt: serverTimestamp()
+    })
+    setText("")
   }
 
   if (!currentUser) return <Navigate to="/signin" replace/>
@@ -170,13 +212,28 @@ function ChatRoom() {
         <button className="btn" onClick={handleSignOut}>Sign Out</button>
       </header>
       <main>
-        <form>
-        <input className="form-control" placeholder="Enter message here..." />
+        {messages && messages.map(msg => <ChatMessage key={`${msg.uid}-${msg.createdAt}`} message={msg}/>)}
+        <span ref={dummy}></span>
+      </main>
+      <form onSubmit={sendMessage}>
+        <input className="form-control" placeholder="Enter message here..." onChange={(e) => {setText(e.target.value)}}required/>
         <button type="submit" className="btn"><img src={send} alt="Send"></img></button>
         </form>
-      </main>
     </div>
   )
+}
+
+function ChatMessage(props) {
+  const {text, name} = props.message
+  const messageClass = name === auth.currentUser?.displayName ? 'sent' : 'received'
+  
+  return (
+    <div className={`message ${messageClass}`}>
+      <h3 className="sender">{name}</h3>
+      <p>{text}</p>
+    </div>
+  )
+
 }
 
 export default App;
