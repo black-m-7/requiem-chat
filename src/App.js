@@ -216,7 +216,7 @@ function ChatRoom() {
         <span ref={dummy}></span>
       </main>
       <form onSubmit={sendMessage}>
-        <input className="form-control" placeholder="Enter message here..." onChange={(e) => {setText(e.target.value)}}required/>
+        <input className="form-control" value={text} placeholder="Enter message here..." onChange={(e) => {setText(e.target.value)}}required/>
         <button type="submit" className="btn"><img src={send} alt="Send"></img></button>
         </form>
     </div>
